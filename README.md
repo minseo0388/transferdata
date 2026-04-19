@@ -20,8 +20,8 @@ This project provides a lightweight web service for uploading and downloading fi
 Requires Node.js (v18 or newer).
 
 ```sh
-git clone https://github.com/USERNAME/REPO_NAME.git
-cd REPO_NAME
+git clone https://github.com/minseo0388/transfer.git
+cd transfer
 npm install
 ```
 
@@ -65,7 +65,7 @@ UPLOAD_DIR=uploads
 
 ## Maintainers
 
-[@USERNAME](https://github.com/USERNAME)
+[@minseo0388](https://github.com/minseo0388)
 
 ## Contributing
 

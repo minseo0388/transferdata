@@ -34,7 +34,7 @@
         <form id="downloadForm" action="#" method="GET">
             <div class="input-group">
                 <label for="code">Transfer Code</label>
-                <input type="text" id="code" name="code" maxlength="5" autocomplete="off" placeholder="•••••" required pattern="^[0-9]{5}$">
+                <input type="text" inputmode="numeric" id="code" name="code" maxlength="5" autocomplete="off" placeholder="•••••" required pattern="^[0-9]{5}$">
             </div>
             
             <div class="actions">
@@ -53,21 +53,25 @@
         const codeInput = document.getElementById('code');
 
         function clearError() {
+            if (typeof bannerTimeout !== 'undefined') clearTimeout(bannerTimeout);
             const existingBanner = document.querySelector('.banner.error');
             if (existingBanner) existingBanner.remove();
             codeInput.classList.remove('input-error');
         }
 
+        let bannerTimeout;
+
         function showError(msg) {
             clearError();
-            
-            const container = document.querySelector('.container');
-            const title = container.querySelector('h1');
             
             const banner = document.createElement('div');
             banner.className = 'banner error';
             banner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + msg;
-            title.insertAdjacentElement('afterend', banner);
+            document.body.appendChild(banner);
+
+            bannerTimeout = setTimeout(() => {
+                banner.remove();
+            }, 4000);
 
             // Add shake and red border to input
             codeInput.classList.add('shake', 'input-error');
@@ -79,7 +83,11 @@
         }
 
         // Clear error states when user types or focuses
-        codeInput.addEventListener('input', clearError);
+        codeInput.addEventListener('input', function(e) {
+            // Strip any non-numeric characters instantly
+            this.value = this.value.replace(/[^0-9]/g, '');
+            clearError();
+        });
         codeInput.addEventListener('focus', clearError);
 
         document.getElementById('downloadForm').addEventListener('submit', async function(e) {
