@@ -98,31 +98,58 @@ app.get('/auth/discord/callback', async (req, res) => {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
-        const guildId = process.env.REQUIRED_GUILD_ID;
-        const roleId = process.env.REQUIRED_ROLE_ID;
+        const allowedGuildsStr = process.env.ALLOWED_GUILDS;
+        const fallbackGuild = process.env.REQUIRED_GUILD_ID;
+        const fallbackRole = process.env.REQUIRED_ROLE_ID;
+
+        let rules = [];
+        if (allowedGuildsStr) {
+            rules = allowedGuildsStr.split(',').filter(Boolean).map(g => {
+                const parts = g.split(':');
+                return { guildId: parts[0].trim(), roleId: parts[1] ? parts[1].trim() : null };
+            });
+        } else if (fallbackGuild) {
+            rules.push({ guildId: fallbackGuild, roleId: fallbackRole || null });
+        }
         
-        let hasAccess = false;
+        let hasAccess = rules.length === 0; // Allow all if no rules configured
         
-        if (guildId && roleId) {
+        if (rules.length > 0) {
             try {
-                const memberResponse = await axios.get(`https://discord.com/api/users/@me/guilds/${guildId}/member`, {
+                // Fetch the guilds the user is in
+                const userGuildsResponse = await axios.get('https://discord.com/api/users/@me/guilds', {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 });
-                
-                const roles = memberResponse.data.roles;
-                if (roles.includes(roleId)) {
-                    hasAccess = true;
+                const userGuildIds = userGuildsResponse.data.map(g => g.id);
+
+                for (const rule of rules) {
+                    if (userGuildIds.includes(rule.guildId)) {
+                        if (rule.roleId) {
+                            try {
+                                const memberResponse = await axios.get(`https://discord.com/api/users/@me/guilds/${rule.guildId}/member`, {
+                                    headers: { Authorization: `Bearer ${accessToken}` }
+                                });
+                                if (memberResponse.data.roles.includes(rule.roleId)) {
+                                    hasAccess = true;
+                                    break;
+                                }
+                            } catch (err) {
+                                console.error(`Failed to fetch member details for guild ${rule.guildId}`);
+                            }
+                        } else {
+                            // No role required, membership is enough
+                            hasAccess = true;
+                            break;
+                        }
+                    }
                 }
             } catch (err) {
-                console.error("Failed to fetch member details", err.response?.data || err.message);
-                // User not in guild or other error
+                console.error("Failed to fetch user guilds", err.response?.data || err.message);
             }
-        } else {
-             hasAccess = true; // allow all if not configured (for dev/test)
         }
 
         if (!hasAccess) {
-             return res.render('error', { message: '권한이 없습니다. 지정된 디스코드 서버에서 알맞은 역할을 보유해야 합니다.' });
+             return res.render('error', { message: '권한이 없습니다. 관리자가 허가한 디스코드 서버 소속이 아니거나 필요한 역할이 부족합니다.' });
         }
 
         req.session.user = {
