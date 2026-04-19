@@ -1,69 +1,78 @@
-# Secure Data Transfer
+# transfer
 
-A premium, minimalistic, and secure web application for transferring files. Upload files to receive a unique 5-digit code, and effortlessly download them anywhere without needing a USB drive.
+[![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-## ✨ Features
+> A simple, secure data transfer application using 5-digit codes.
 
-- **5-Digit Code System**: Easily download files by entering a unique, auto-generated 5-digit code.
-- **Discord OAuth Auth**: File upload access is strictly controlled using Discord OAuth.
-  - Supports role-based access control.
-  - Flexible multi-server configurations (allow members from Guild A with a specific role, or anyone from Guild B).
-- **Secure File Expiration**: Files are automatically deleted via a background cron job once they expire or hit the maximum download limit.
-- **Modern Minimal UI**: Built with a dark mode sleek Vercel/Linear-like design with beautiful micro-interactions, responsive drag & drop, and slide-in notifications.
-- **AJAX Driven Verifications**: Checking code validity without annoying page reloads or redirects.
+This project provides a lightweight web service for uploading and downloading files. It uses Discord OAuth for access control, issues a unique 5-digit code for each uploaded file, and automatically handles file expiration and deletion.
 
-## 🚀 Getting Started
+## Table of Contents
 
-### 1. Prerequisites
-- Node.js (v18+)
-- NPM
-- A Discord Developer App for OAuth configuration.
+- [Install](#install)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
 
-### 2. Installation
-Clone the repository and install dependencies:
-\`\`\`bash
+## Install
+
+Requires Node.js (v18 or newer).
+
+```sh
 git clone https://github.com/USERNAME/REPO_NAME.git
 cd REPO_NAME
 npm install
-\`\`\`
+```
 
-### 3. Environment Variables
-Copy the template to create your `.env` file:
-\`\`\`bash
+## Usage
+
+Start the server using `npm`:
+
+```sh
+npm start
+```
+
+The application will be accessible at `http://localhost:3000`. 
+- **Download**: Enter the 5-digit code on the main page.
+- **Upload**: Click the upload button to authenticate via Discord, configure file limits, and receive your code.
+
+## Configuration
+
+Copy the example environment file:
+
+```sh
 cp .env.example .env
-\`\`\`
+```
 
-Edit `.env` and fill out your Discord Portal credentials:
-\`\`\`env
+Edit the `.env` file to configure your Discord OAuth and permissions:
+
+```env
 PORT=3000
-DISCORD_CLIENT_ID=your_client_id_here
-DISCORD_CLIENT_SECRET=your_client_secret_here
-DISCORD_CALLBACK_URL=http://localhost:3000/auth/discord/callback
-SESSION_SECRET=a_very_secure_secret_key
+DISCORD_CLIENT_ID=your_client_id
+DISCORD_CLIENT_SECRET=your_client_secret
+DISCORD_CALLBACK_URL=http://your-domain.com/auth/discord/callback
+SESSION_SECRET=secure_session_secret
 
-# Define rules for allowed guilds via: Guild_ID:Role_ID
-# Example 1: 112233:998877 (Role explicitly required)
-# Example 2: 112233:, 445566: (No role required, membership to either server is enough)
+# Specify allowed Discord guilds (servers) and required roles.
+# Format: GuildID:RoleID,GuildID:RoleID
+# Example: 112233:998877,445566: 
+# (Leave the RoleID empty if joining the guild is sufficient)
 ALLOWED_GUILDS=your_guild_id_here:your_role_id_here
 
 UPLOAD_DIR=uploads
-\`\`\`
+```
 
-### 4. Running the Server
-\`\`\`bash
-npm start
-\`\`\`
-The application will be running at \`http://localhost:3000\`.
+## Maintainers
 
-## 🛠 Tech Stack
-- **Backend:** Node.js, Express
-- **View Engine:** EJS
-- **Database:** SQLite (No external database setups required)
-- **Styling:** Vanilla CSS (Pretendard Font, Modern UI styling)
-- **File Handling:** Multer
-- **Background Jobs:** Node-Cron
+[@USERNAME](https://github.com/USERNAME)
 
-## 💡 Notes
-- Upload limit is set to **200MB**.
-- Ensure \`uploads\` directory exists or has write permissions (app creates it automatically).
-- Periodic cleanup runs every hour to physically delete expired files safely.
+## Contributing
+
+PRs accepted.
+
+Small note: If editing the README, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
+
+## License
+
+MIT © 2026
