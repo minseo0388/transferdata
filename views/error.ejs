@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error | Secure Data Transfer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="container">
+        <i class="fas fa-exclamation-triangle error-icon"></i>
+        <h1 style="background: none; -webkit-text-fill-color: var(--danger-color); color: var(--danger-color);">오류가 발생했습니다</h1>
+        <p class="subtitle" style="margin-top: 15px; font-size: 1.1rem; color: var(--text-primary);">
+            <%= message || '알 수 없는 오류가 발생했습니다.' %>
+        </p>
+
+        <div class="actions" style="margin-top: 30px;">
+            <a href="/" class="btn"><i class="fas fa-home"></i> 메인으로 돌아가기</a>
+        </div>
+    </div>
+</body>
+</html>

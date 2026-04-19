@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Data Transfer</title>
+    <meta name="description" content="Securely transfer your files using a 5-digit code.">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <% if (user) { %>
+    <div class="auth-nav">
+        <div class="user-info">
+            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=128" alt="User Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+            <span><%= user.username %></span>
+        </div>
+        <a href="/logout"><i class="fas fa-sign-out-alt"></i> 로그아웃</a>
+    </div>
+    <% } %>
+
+    <div class="container">
+        <h1>Secure Transfer</h1>
+        <% if (locals.error) { %>
+            <div class="banner error">
+                <i class="fas fa-exclamation-triangle"></i> <%= error %>
+            </div>
+        <% } %>
+        <p class="subtitle">Enter your 5-digit code to download.</p>
+
+        <form id="downloadForm" action="#" method="GET">
+            <div class="input-group">
+                <label for="code">Transfer Code</label>
+                <input type="text" id="code" name="code" maxlength="5" autocomplete="off" placeholder="•••••" required pattern="^[0-9]{5}$">
+            </div>
+            
+            <div class="actions">
+                <button type="submit" class="btn"><i class="fas fa-download"></i> 다운로드</button>
+            </div>
+        </form>
+
+        <div class="divider"><span>OR</span></div>
+
+        <div class="actions">
+            <a href="/upload" class="btn btn-secondary"><i class="fas fa-cloud-upload-alt"></i> 파일 업로드하기</a>
+        </div>
+    </div>
+
+    <script>
+        const codeInput = document.getElementById('code');
+
+        function clearError() {
+            const existingBanner = document.querySelector('.banner.error');
+            if (existingBanner) existingBanner.remove();
+            codeInput.classList.remove('input-error');
+        }
+
+        function showError(msg) {
+            clearError();
+            
+            const container = document.querySelector('.container');
+            const title = container.querySelector('h1');
+            
+            const banner = document.createElement('div');
+            banner.className = 'banner error';
+            banner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + msg;
+            title.insertAdjacentElement('afterend', banner);
+
+            // Add shake and red border to input
+            codeInput.classList.add('shake', 'input-error');
+            
+            // Remove shake class after animation completes (0.4s) so it can be re-triggered
+            setTimeout(() => {
+                codeInput.classList.remove('shake');
+            }, 400);
+        }
+
+        // Clear error states when user types or focuses
+        codeInput.addEventListener('input', clearError);
+        codeInput.addEventListener('focus', clearError);
+
+        document.getElementById('downloadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const code = codeInput.value;
+            const btn = this.querySelector('button[type="submit"]');
+
+            if (code.length === 5 && /^[0-9]{5}$/.test(code)) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 확인 중...';
+                
+                try {
+                    const response = await fetch('/api/check/' + code);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        window.location.href = '/api/download/' + code;
+                        // Reload state to clear input and banner after starting download (optional)
+                        setTimeout(() => {
+                            codeInput.value = '';
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
+                        }, 2000);
+                    } else {
+                        showError(data.message);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
+                        codeInput.focus();
+                    }
+                } catch(err) {
+                    showError('서버 통신 중 오류가 발생했습니다.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
+                }
+            } else {
+                showError('유효한 5자리 숫자를 입력하세요.');
+            }
+        });
+    </script>
+</body>
+</html>

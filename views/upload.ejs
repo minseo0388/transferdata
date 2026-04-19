@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload | Secure Data Transfer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="auth-nav">
+        <div class="user-info">
+            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=128" alt="User Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+            <span><%= user.username %></span>
+        </div>
+        <a href="/logout"><i class="fas fa-sign-out-alt"></i> 로그아웃</a>
+    </div>
+
+    <div class="container" style="max-width: 600px;">
+        <div id="uploadFlow">
+            <h1>Upload File</h1>
+            <p class="subtitle">Drag & Drop to securely share your file (Max: 200MB)</p>
+
+            <form id="uploadForm">
+                <div class="dropzone" id="dropzone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>클릭하여 파일 선택 또는 여기로 드래그</h3>
+                    <p id="fileNameDisplay">선택된 파일 없음</p>
+                    <input type="file" id="fileInput" name="file" required>
+                </div>
+
+                <div class="settings-group">
+                    <div class="input-group">
+                        <label for="downloadLimit">다운로드 제한 횟수 (0=무제한)</label>
+                        <input type="number" id="downloadLimit" name="downloadLimit" min="0" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label for="daysToKeep">보관 일수 (최대 30일)</label>
+                        <input type="number" id="daysToKeep" name="daysToKeep" min="1" max="30" value="30">
+                    </div>
+                </div>
+
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn" id="uploadBtn"><i class="fas fa-paper-plane"></i> 업로드 시작</button>
+                    <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 돌아가기</a>
+                </div>
+            </form>
+        </div>
+
+        <div id="resultArea">
+            <i class="fas fa-check-circle" style="font-size: 3rem; color: #34d399; margin-bottom: 15px;"></i>
+            <h2>업로드 완료!</h2>
+            <p>아래 5자리 코드를 공유하세요.</p>
+            <div class="code-display" id="codeDisplay">-----</div>
+            <div class="actions" style="margin-top: 20px;">
+                <button class="btn" onclick="location.reload()"><i class="fas fa-redo"></i> 새 파일 업로드</button>
+                <a href="/" class="btn btn-secondary"><i class="fas fa-home"></i> 홈으로 돌아가기</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const uploadForm = document.getElementById('uploadForm');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadFlow = document.getElementById('uploadFlow');
+        const resultArea = document.getElementById('resultArea');
+        const codeDisplay = document.getElementById('codeDisplay');
+
+        // Drag & Drop Handling
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (file.size > 200 * 1024 * 1024) {
+                    alert('파일은 200MB를 초과할 수 없습니다.');
+                    fileInput.value = '';
+                    fileNameDisplay.textContent = '선택된 파일 없음';
+                    return;
+                }
+                fileNameDisplay.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+            } else {
+                fileNameDisplay.textContent = '선택된 파일 없음';
+            }
+        }
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) {
+                alert('파일을 선택해주세요.');
+                return;
+            }
+
+            const formData = new FormData(uploadForm);
+            
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 업로드 중...';
+            progressContainer.style.display = 'block';
+
+            try {
+                const response = await axios.post('/api/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    onUploadProgress: (progressEvent) => {
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                        progressFill.style.width = percentCompleted + '%';
+                    }
+                });
+
+                if (response.data.success) {
+                    uploadFlow.style.display = 'none';
+                    resultArea.style.display = 'block';
+                    codeDisplay.textContent = response.data.code;
+                }
+            } catch (error) {
+                console.error(error);
+                alert(error.response?.data?.message || '업로드 중 오류가 발생했습니다.');
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 업로드 시작';
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+            }
+        });
+    </script>
+</body>
+</html>
