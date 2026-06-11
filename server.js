@@ -215,6 +215,7 @@ app.get('/auth/google/callback', async (req, res) => {
             provider: 'google',
             username: googleUser.name,
             email: email,
+            avatar: googleUser.picture,
             isAdmin: isAdmin
         };
 

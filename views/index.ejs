@@ -18,7 +18,7 @@
             <% if (user.provider === 'discord') { %>
                 <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=128" alt="User Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
             <% } else if (user.provider === 'google') { %>
-                <i class="fab fa-google" style="font-size: 24px; margin-right: 8px; color: #DB4437;"></i>
+                <img src="<%= user.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png' %>" alt="User Avatar" onerror="this.style.display='none'">
             <% } %>
             <span><%= user.username %></span>
         </div>
