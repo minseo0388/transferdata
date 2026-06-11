@@ -129,13 +129,14 @@ app.get('/auth/discord/callback', async (req, res) => {
         const existingUser = await db.checkUserExists('discord', null, discordId);
 
         if (!existingUser) {
-            // Redirect to registration
-            req.session.tempDiscordUser = {
-                id: discordId,
-                username: discordUser.username,
-                email: email
-            };
-            return res.redirect('/auth/register?provider=discord');
+            // Automatically create user
+            await db.createUser({
+                id: uuid.v4(),
+                provider: 'discord',
+                providerEmail: email,
+                providerDiscordId: discordId,
+                username: discordUser.username
+            });
         }
 
         // Check if admin
@@ -195,13 +196,14 @@ app.get('/auth/google/callback', async (req, res) => {
         const existingUser = await db.checkUserExists('google', email, null);
 
         if (!existingUser) {
-            // Redirect to registration
-            req.session.tempGoogleUser = {
-                id: email,
-                email: email,
-                name: googleUser.name
-            };
-            return res.redirect('/auth/register?provider=google');
+            // Automatically create user
+            await db.createUser({
+                id: uuid.v4(),
+                provider: 'google',
+                providerEmail: email,
+                providerDiscordId: null,
+                username: googleUser.name
+            });
         }
 
         // Check if admin
