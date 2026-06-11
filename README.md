@@ -1,13 +1,14 @@
-# transfer
+# Secure Data Transfer
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-> A simple, secure data transfer application using 5-digit codes.
+> A secure, private web service for transferring large files using 5-digit codes and social login.
 
-This project provides a lightweight web service for uploading and downloading files. It uses Discord OAuth for access control, issues a unique 5-digit code for each uploaded file, and automatically handles file expiration and deletion.
+This project provides a lightweight, fully private web service for uploading and downloading files. It features an admin approval system, multi-file zipping, automatic file expiration via scheduling, and seamless authentication via Google and Discord.
 
 ## Table of Contents
 
+- [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
 - [Configuration](#configuration)
@@ -15,13 +16,17 @@ This project provides a lightweight web service for uploading and downloading fi
 - [Contributing](#contributing)
 - [License](#license)
 
+## Background
+
+Originally built to share files securely within restricted communities, this tool has evolved into a robust transfer platform. It uses SQLite for lightweight data management and handles up to 1GB (max 5 files) per upload, generating a simple 5-digit code for easy retrieval.
+
 ## Install
 
 Requires Node.js (v18 or newer).
 
 ```sh
-git clone https://github.com/minseo0388/transfer.git
-cd transfer
+git clone https://github.com/minseo0388/transferdata.git
+cd transferdata
 npm install
 ```
 
@@ -33,9 +38,10 @@ Start the server using `npm`:
 npm start
 ```
 
-The application will be accessible at `http://localhost:3000`. 
-- **Download**: Enter the 5-digit code on the main page.
-- **Upload**: Click the upload button to authenticate via Discord, configure file limits, and receive your code.
+The application will be accessible at `http://localhost:3333` (or the port specified in `.env`). 
+- **Download**: Enter the 5-digit code on the main page. Multiple files will be automatically zipped.
+- **Upload**: Authenticate via Google or Discord. New users must be approved by an Admin.
+- **Admin Dashboard**: Admins can visit `/admin` to approve or reject pending user registrations.
 
 ## Configuration
 
@@ -45,22 +51,26 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Edit the `.env` file to configure your Discord OAuth and permissions:
+Edit the `.env` file to configure your server, OAuth providers, and Admin accounts:
 
 ```env
-PORT=3000
-DISCORD_CLIENT_ID=your_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_CALLBACK_URL=http://your-domain.com/auth/discord/callback
-SESSION_SECRET=secure_session_secret
-
-# Specify allowed Discord guilds (servers) and required roles.
-# Format: GuildID:RoleID,GuildID:RoleID
-# Example: 112233:998877,445566: 
-# (Leave the RoleID empty if joining the guild is sufficient)
-ALLOWED_GUILDS=your_guild_id_here:your_role_id_here
-
+PORT=3333
+SESSION_SECRET=a_very_secure_session_secret_key
 UPLOAD_DIR=uploads
+
+# Discord OAuth Configuration
+DISCORD_CLIENT_ID=your_discord_client_id
+DISCORD_CLIENT_SECRET=your_discord_client_secret
+DISCORD_CALLBACK_URL=http://your-domain.com/auth/discord/callback
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://your-domain.com/auth/google/callback
+
+# Admin Setup (Required to access the /admin dashboard and approve users)
+ADMIN_DISCORD_ID=your_discord_user_id
+ADMIN_GOOGLE_EMAIL=your_google_email@gmail.com
 ```
 
 ## Maintainers
