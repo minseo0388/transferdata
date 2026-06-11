@@ -7,10 +7,15 @@ const fs = require('fs');
 const axios = require('axios');
 const uuid = require('uuid');
 const cron = require('node-cron');
+const archiver = require('archiver');
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3333;
+
+// Admin credentials
+const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID || '1216386341554622474';
+const ADMIN_GOOGLE_EMAIL = process.env.ADMIN_GOOGLE_EMAIL || 'choiminseo0388@gmail.com';
 
 // Setup directories
 const UPLOAD_DIR = path.join(__dirname, process.env.UPLOAD_DIR || 'uploads');
@@ -50,30 +55,48 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 200 * 1024 * 1024 } // 200MB limit
+    limits: { fileSize: 200 * 1024 * 1024 } // 200MB limit per file
 });
 
 function requireAuth(req, res, next) {
     if (!req.session.user) {
         req.session.returnTo = req.originalUrl;
-        return res.redirect('/auth/discord');
+        return res.redirect('/auth/choice');
     }
     next();
 }
 
+function requireAdmin(req, res, next) {
+    if (!req.session.user || !req.session.user.isAdmin) {
+        return res.status(403).render('error', { message: '관리자만 접근할 수 있습니다.' });
+    }
+    next();
+}
+
+// Routes
+
 app.get('/', (req, res) => {
     res.render('index', { user: req.session.user, error: req.query.error });
+});
+
+app.get('/terms', (req, res) => {
+    res.render('terms');
 });
 
 app.get('/upload', requireAuth, (req, res) => {
     res.render('upload', { user: req.session.user });
 });
 
+// Auth choice page
+app.get('/auth/choice', (req, res) => {
+    res.render('auth-choice');
+});
+
+// Discord OAuth
 app.get('/auth/discord', (req, res) => {
     const clientId = process.env.DISCORD_CLIENT_ID;
     const redirectUri = encodeURIComponent(process.env.DISCORD_CALLBACK_URL);
-    // require guilds.members.read to check user's roles in the server
-    res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds%20guilds.members.read`);
+    res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify`);
 });
 
 app.get('/auth/discord/callback', async (req, res) => {
@@ -98,64 +121,33 @@ app.get('/auth/discord/callback', async (req, res) => {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
-        const allowedGuildsStr = process.env.ALLOWED_GUILDS;
-        const fallbackGuild = process.env.REQUIRED_GUILD_ID;
-        const fallbackRole = process.env.REQUIRED_ROLE_ID;
+        const discordUser = userResponse.data;
+        const discordId = discordUser.id;
+        const email = discordUser.email;
 
-        let rules = [];
-        if (allowedGuildsStr) {
-            rules = allowedGuildsStr.split(',').filter(Boolean).map(g => {
-                const parts = g.split(':');
-                return { guildId: parts[0].trim(), roleId: parts[1] ? parts[1].trim() : null };
-            });
-        } else if (fallbackGuild) {
-            rules.push({ guildId: fallbackGuild, roleId: fallbackRole || null });
-        }
-        
-        let hasAccess = rules.length === 0; // Allow all if no rules configured
-        
-        if (rules.length > 0) {
-            try {
-                // Fetch the guilds the user is in
-                const userGuildsResponse = await axios.get('https://discord.com/api/users/@me/guilds', {
-                    headers: { Authorization: `Bearer ${accessToken}` }
-                });
-                const userGuildIds = userGuildsResponse.data.map(g => g.id);
+        // Check if user exists
+        const existingUser = await db.checkUserExists('discord', null, discordId);
 
-                for (const rule of rules) {
-                    if (userGuildIds.includes(rule.guildId)) {
-                        if (rule.roleId) {
-                            try {
-                                const memberResponse = await axios.get(`https://discord.com/api/users/@me/guilds/${rule.guildId}/member`, {
-                                    headers: { Authorization: `Bearer ${accessToken}` }
-                                });
-                                if (memberResponse.data.roles.includes(rule.roleId)) {
-                                    hasAccess = true;
-                                    break;
-                                }
-                            } catch (err) {
-                                console.error(`Failed to fetch member details for guild ${rule.guildId}`);
-                            }
-                        } else {
-                            // No role required, membership is enough
-                            hasAccess = true;
-                            break;
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to fetch user guilds", err.response?.data || err.message);
-            }
+        if (!existingUser) {
+            // Redirect to registration
+            req.session.tempDiscordUser = {
+                id: discordId,
+                username: discordUser.username,
+                email: email
+            };
+            return res.redirect('/auth/register?provider=discord');
         }
 
-        if (!hasAccess) {
-             return res.render('error', { message: '권한이 없습니다. 관리자가 허가한 디스코드 서버 소속이 아니거나 필요한 역할이 부족합니다.' });
-        }
+        // Check if admin
+        const isAdmin = discordId === ADMIN_DISCORD_ID;
 
+        // Set session
         req.session.user = {
-            id: userResponse.data.id,
-            username: userResponse.data.username,
-            avatar: userResponse.data.avatar
+            id: discordId,
+            provider: 'discord',
+            username: discordUser.username,
+            avatar: discordUser.avatar,
+            isAdmin: isAdmin
         };
 
         const returnTo = req.session.returnTo || '/';
@@ -163,8 +155,201 @@ app.get('/auth/discord/callback', async (req, res) => {
         res.redirect(returnTo);
 
     } catch (err) {
-        console.error(err.response?.data || err.message);
+        console.error(err);
         res.redirect('/?error=AuthFailed');
+    }
+});
+
+// Google OAuth
+app.get('/auth/google', (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = encodeURIComponent(process.env.GOOGLE_CALLBACK_URL);
+    const scope = encodeURIComponent('openid profile email');
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+    if (!req.query.code) return res.redirect('/?error=NoCode');
+
+    try {
+        // Exchange code for token
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            code: req.query.code,
+            grant_type: 'authorization_code',
+            redirect_uri: process.env.GOOGLE_CALLBACK_URL
+        });
+
+        const accessToken = tokenResponse.data.access_token;
+
+        // Get user info
+        const userResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        const googleUser = userResponse.data;
+        const email = googleUser.email;
+
+        // Check if user exists
+        const existingUser = await db.checkUserExists('google', email, null);
+
+        if (!existingUser) {
+            // Redirect to registration
+            req.session.tempGoogleUser = {
+                id: email,
+                email: email,
+                name: googleUser.name
+            };
+            return res.redirect('/auth/register?provider=google');
+        }
+
+        // Check if admin
+        const isAdmin = email === ADMIN_GOOGLE_EMAIL;
+
+        // Set session
+        req.session.user = {
+            id: email,
+            provider: 'google',
+            username: googleUser.name,
+            email: email,
+            isAdmin: isAdmin
+        };
+
+        const returnTo = req.session.returnTo || '/';
+        delete req.session.returnTo;
+        res.redirect(returnTo);
+
+    } catch (err) {
+        console.error(err);
+        res.redirect('/?error=AuthFailed');
+    }
+});
+
+// Registration page and handler
+app.get('/auth/register', (req, res) => {
+    const provider = req.query.provider;
+    if (!provider || (provider !== 'discord' && provider !== 'google')) {
+        return res.render('error', { message: '잘못된 요청입니다.' });
+    }
+
+    let tempUser = null;
+    if (provider === 'discord') {
+        tempUser = req.session.tempDiscordUser;
+    } else if (provider === 'google') {
+        tempUser = req.session.tempGoogleUser;
+    }
+
+    if (!tempUser) {
+        return res.render('error', { message: '다시 로그인해주세요.' });
+    }
+
+    res.render('register', { provider, tempUser });
+});
+
+app.post('/auth/register', async (req, res) => {
+    try {
+        const provider = req.body.provider;
+        const username = req.body.username;
+        const confirmIdentifier = req.body.confirmIdentifier;
+
+        if (!provider || !username || !confirmIdentifier) {
+            return res.status(400).json({ success: false, message: '필수 정보가 누락되었습니다.' });
+        }
+
+        let tempUser = null;
+        if (provider === 'discord') {
+            tempUser = req.session.tempDiscordUser;
+        } else if (provider === 'google') {
+            tempUser = req.session.tempGoogleUser;
+        }
+
+        if (!tempUser) {
+            return res.status(400).json({ success: false, message: '다시 로그인해주세요.' });
+        }
+
+        // Verify identifier matches
+        let isMatch = false;
+        if (provider === 'discord') {
+            isMatch = confirmIdentifier === tempUser.id;
+        } else if (provider === 'google') {
+            isMatch = confirmIdentifier === tempUser.email;
+        }
+
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: '일치하지 않는 정보입니다.' });
+        }
+
+        // Create pending registration
+        const pendingId = uuid.v4();
+        const pendingData = {
+            id: pendingId,
+            provider: provider,
+            username: username,
+            providerEmail: provider === 'google' ? tempUser.email : null,
+            providerDiscordId: provider === 'discord' ? tempUser.id : null
+        };
+
+        await db.createPendingRegistration(pendingData);
+
+        // Clear temp data
+        delete req.session.tempDiscordUser;
+        delete req.session.tempGoogleUser;
+
+        return res.json({ 
+            success: true, 
+            message: '가입 신청이 제출되었습니다. 관리자의 승인을 기다려주세요.',
+            redirect: '/'
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+    }
+});
+
+// Admin panel
+app.get('/admin', requireAdmin, async (req, res) => {
+    try {
+        const pending = await db.getPendingRegistrations();
+        res.render('admin', { user: req.session.user, pending });
+    } catch (err) {
+        console.error(err);
+        res.render('error', { message: '오류가 발생했습니다.' });
+    }
+});
+
+// Approve registration
+app.post('/admin/approve', requireAdmin, async (req, res) => {
+    try {
+        const registrationId = req.body.registrationId;
+        if (!registrationId) {
+            return res.status(400).json({ success: false, message: '잘못된 요청입니다.' });
+        }
+
+        await db.approvePendingRegistration(registrationId);
+        res.json({ success: true, message: '승인 완료' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: '오류가 발생했습니다.' });
+    }
+});
+
+// Reject registration
+app.post('/admin/reject', requireAdmin, async (req, res) => {
+    try {
+        const registrationId = req.body.registrationId;
+        if (!registrationId) {
+            return res.status(400).json({ success: false, message: '잘못된 요청입니다.' });
+        }
+
+        await db.rejectPendingRegistration(registrationId);
+        res.json({ success: true, message: '거부 완료' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: '오류가 발생했습니다.' });
     }
 });
 
@@ -174,8 +359,8 @@ app.get('/logout', (req, res) => {
 });
 
 
-app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => {
-    if (!req.file) {
+app.post('/api/upload', requireAuth, upload.array('files', 5), async (req, res) => {
+    if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: '파일이 없습니다.' });
     }
 
@@ -186,12 +371,51 @@ app.post('/api/upload', requireAuth, upload.single('file'), async (req, res) => 
         
         const code = await db.getUniqueCode();
         
+        let finalFilename = '';
+        let finalOriginalName = '';
+        let finalSize = 0;
+
+        if (req.files.length === 1) {
+            finalFilename = req.files[0].filename;
+            finalOriginalName = req.files[0].originalname;
+            finalSize = req.files[0].size;
+        } else {
+            // Zip multiple files
+            finalOriginalName = `Secure_Transfer_${code}.zip`;
+            finalFilename = `${Date.now()}-${Math.round(Math.random() * 1E9)}.zip`;
+            const zipPath = path.join(UPLOAD_DIR, finalFilename);
+            
+            const output = fs.createWriteStream(zipPath);
+            const archive = archiver('zip', { zlib: { level: 9 } });
+            
+            await new Promise((resolve, reject) => {
+                output.on('close', () => resolve());
+                archive.on('error', err => reject(err));
+                archive.pipe(output);
+                
+                req.files.forEach(file => {
+                    archive.file(file.path, { name: file.originalname });
+                });
+                
+                archive.finalize();
+            });
+            
+            finalSize = fs.statSync(zipPath).size;
+            
+            // Delete original uploaded files
+            req.files.forEach(file => {
+                fs.unlink(file.path, (err) => {
+                    if (err) console.error('Failed to delete temp file:', err);
+                });
+            });
+        }
+        
         const fileData = {
             id: uuid.v4(),
             code: code,
-            originalName: req.file.originalname,
-            filename: req.file.filename,
-            size: req.file.size,
+            originalName: finalOriginalName,
+            filename: finalFilename,
+            size: finalSize,
             uploadTime: Date.now(),
             expiresAt: expiresAt,
             uploaderId: req.session.user.id,

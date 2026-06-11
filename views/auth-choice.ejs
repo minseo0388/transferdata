@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - Secure Data Transfer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .auth-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: #fff;
+        }
+        .btn-discord {
+            background-color: #5865F2;
+        }
+        .btn-discord:hover {
+            background-color: #4752C4;
+        }
+        .btn-google {
+            background-color: #DB4437;
+        }
+        .btn-google:hover {
+            background-color: #C13527;
+        }
+    </style>
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="container" style="max-width: 400px;">
+        <h1>로그인 선택</h1>
+        <p class="subtitle">파일을 업로드하려면 로그인이 필요합니다.</p>
+
+        <div style="margin-top: 2rem;">
+            <a href="/auth/discord" class="auth-btn btn-discord">
+                <i class="fab fa-discord fa-lg"></i> 디스코드 로그인
+            </a>
+            <a href="/auth/google" class="auth-btn btn-google">
+                <i class="fab fa-google fa-lg"></i> 구글 로그인
+            </a>
+        </div>
+
+        <div class="actions" style="margin-top: 2rem;">
+            <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> 돌아가기</a>
+        </div>
+    </div>
+</body>
+</html>

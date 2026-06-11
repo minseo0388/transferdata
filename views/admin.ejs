@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지 - Secure Data Transfer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            text-align: left;
+        }
+        .pending-list {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .pending-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pending-info h3 {
+            margin: 0 0 5px 0;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+        .pending-info p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+        }
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-approve {
+            background: #2ecc71;
+            padding: 8px 15px;
+            border-radius: 5px;
+            color: #fff;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-reject {
+            background: #e74c3c;
+            padding: 8px 15px;
+            border-radius: 5px;
+            color: #fff;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 10px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="auth-nav">
+        <div class="user-info">
+            <span>Admin: <%= user.username %></span>
+        </div>
+        <a href="/logout"><i class="fas fa-sign-out-alt"></i> 로그아웃</a>
+    </div>
+
+    <div class="container admin-container">
+        <h1>관리자 대시보드</h1>
+        <p class="subtitle">가입 대기 중인 사용자를 승인하거나 거부할 수 있습니다.</p>
+
+        <div class="pending-list">
+            <% if (pending && pending.length > 0) { %>
+                <% pending.forEach(function(req) { %>
+                    <div class="pending-item" id="req-<%= req.id %>">
+                        <div class="pending-info">
+                            <h3><%= req.username %> <span class="badge"><%= req.provider %></span></h3>
+                            <p>
+                                식별자: <%= req.provider === 'google' ? req.providerEmail : req.providerDiscordId %>
+                            </p>
+                            <p style="font-size: 0.8rem; margin-top: 5px;">신청일: <%= new Date(req.requestedAt).toLocaleString() %></p>
+                        </div>
+                        <div class="admin-actions">
+                            <button class="btn-approve" onclick="handleAction('<%= req.id %>', 'approve')"><i class="fas fa-check"></i> 승인</button>
+                            <button class="btn-reject" onclick="handleAction('<%= req.id %>', 'reject')"><i class="fas fa-times"></i> 거부</button>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } else { %>
+                <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 2rem;">
+                    대기 중인 가입 신청이 없습니다.
+                </div>
+            <% } %>
+        </div>
+        
+        <div class="actions" style="margin-top: 3rem; text-align: center;">
+            <a href="/" class="btn btn-secondary"><i class="fas fa-home"></i> 메인으로 돌아가기</a>
+        </div>
+    </div>
+
+    <script>
+        async function handleAction(id, action) {
+            if(!confirm(action === 'approve' ? '해당 사용자를 승인하시겠습니까?' : '해당 신청을 거부하시겠습니까?')) return;
+            
+            try {
+                const response = await fetch('/admin/' + action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ registrationId: id })
+                });
+                const data = await response.json();
+                if(data.success) {
+                    const item = document.getElementById('req-' + id);
+                    if(item) item.remove();
+                    
+                    // Check if list is empty
+                    const list = document.querySelector('.pending-list');
+                    if(list && list.children.length === 0) {
+                        list.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.5); padding: 2rem;">대기 중인 가입 신청이 없습니다.</div>';
+                    }
+                } else {
+                    alert('오류 발생: ' + data.message);
+                }
+            } catch(e) {
+                alert('서버 통신 중 오류가 발생했습니다.');
+            }
+        }
+    </script>
+</body>
+</html>

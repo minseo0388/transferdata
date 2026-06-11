@@ -22,14 +22,14 @@
     <div class="container" style="max-width: 600px;">
         <div id="uploadFlow">
             <h1>Upload File</h1>
-            <p class="subtitle">Drag & Drop to securely share your file (Max: 200MB)</p>
+            <p class="subtitle">Drag & Drop to securely share your files (Max: 5 files, 1GB total)</p>
 
             <form id="uploadForm">
                 <div class="dropzone" id="dropzone">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h3>클릭하여 파일 선택 또는 여기로 드래그</h3>
                     <p id="fileNameDisplay">선택된 파일 없음</p>
-                    <input type="file" id="fileInput" name="file" required>
+                    <input type="file" id="fileInput" name="files" multiple required>
                 </div>
 
                 <div class="settings-group">
@@ -105,15 +105,40 @@
         fileInput.addEventListener('change', updateFileName);
 
         function updateFileName() {
+            if (fileInput.files.length > 5) {
+                alert('파일은 최대 5개까지만 업로드할 수 있습니다.');
+                fileInput.value = '';
+                fileNameDisplay.textContent = '선택된 파일 없음';
+                return;
+            }
+
             if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                if (file.size > 200 * 1024 * 1024) {
-                    alert('파일은 200MB를 초과할 수 없습니다.');
+                let totalSize = 0;
+                let fileNames = [];
+                for(let i=0; i<fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    if (file.size > 200 * 1024 * 1024) {
+                        alert('각 파일은 200MB를 초과할 수 없습니다: ' + file.name);
+                        fileInput.value = '';
+                        fileNameDisplay.textContent = '선택된 파일 없음';
+                        return;
+                    }
+                    totalSize += file.size;
+                    fileNames.push(file.name);
+                }
+
+                if (totalSize > 1024 * 1024 * 1024) {
+                    alert('파일들의 총 용량은 1GB를 초과할 수 없습니다.');
                     fileInput.value = '';
                     fileNameDisplay.textContent = '선택된 파일 없음';
                     return;
                 }
-                fileNameDisplay.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+
+                if (fileInput.files.length === 1) {
+                    fileNameDisplay.textContent = fileNames[0] + ' (' + (totalSize / 1024 / 1024).toFixed(2) + ' MB)';
+                } else {
+                    fileNameDisplay.textContent = fileInput.files.length + '개 파일 선택됨 (' + (totalSize / 1024 / 1024).toFixed(2) + ' MB 총합)';
+                }
             } else {
                 fileNameDisplay.textContent = '선택된 파일 없음';
             }
